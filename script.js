@@ -1,4 +1,4 @@
-console.log("Script.js byl úspěšně načten!"); // Kontrola v konzoli
+console.log("Script.js v3.0 načten - Synchronizace opravu");
 
 // --- HTML Elementy ---
 const board = document.getElementById('game-board');
@@ -11,7 +11,6 @@ const lobbyOverlay = document.getElementById('lobby-overlay');
 const hostStatus = document.getElementById('host-status');
 const connectionStatus = document.getElementById('connection-status');
 
-// UI Karty hráčů
 const p1Card = document.getElementById('p1-card');
 const p2Card = document.getElementById('p2-card');
 
@@ -19,12 +18,13 @@ const p2Card = document.getElementById('p2-card');
 const BOARD_SIZE = 11;
 const PATH_LENGTH = 40;
 
-// Hráči a stav
+// Hráči
 let PLAYERS = [
     { id: 0, name: 'Zrzek', class: 'p1', colorClass: 'player-orange', startPos: 0, tokens: [-1, -1, -1, -1], baseIndices: [0, 1, 2, 3] },
     { id: 1, name: 'Modrák', class: 'p2', colorClass: 'player-blue', startPos: 20, tokens: [-1, -1, -1, -1], baseIndices: [4, 5, 6, 7] }
 ];
 
+// Stav hry
 let GAME_STATE = {
     currentPlayerIndex: 0,
     currentRoll: 0,
@@ -36,7 +36,7 @@ let GAME_STATE = {
 let myPlayerId = null; 
 let conn = null; 
 
-// --- Mapy ---
+// --- Mapy (Cesty) ---
 const pathMap = [
     {x:4, y:10}, {x:4, y:9}, {x:4, y:8}, {x:4, y:7}, {x:4, y:6}, {x:3, y:6}, {x:2, y:6}, {x:1, y:6}, {x:0, y:6}, 
     {x:0, y:5}, {x:0, y:4}, {x:1, y:4}, {x:2, y:4}, {x:3, y:4}, {x:4, y:4}, {x:4, y:3}, {x:4, y:2}, {x:4, y:1}, {x:4, y:0},
@@ -48,10 +48,9 @@ const homePaths = [[{x:5, y:9}, {x:5, y:8}, {x:5, y:7}, {x:5, y:6}], [{x:5, y:1}
 const bases = [{x:0, y:10}, {x:1, y:10}, {x:0, y:9}, {x:1, y:9}, {x:9, y:1}, {x:10, y:1}, {x:9, y:0}, {x:10, y:0}];
 
 // ==========================================
-// SÍŤOVÁ ČÁST (S VYLEPŠENÝM DEBUGGINGEM)
+// SÍŤOVÁ ČÁST
 // ==========================================
 
-// Konfigurace pro lepší průchod firewallem (STUN servery)
 const peer = new Peer(null, {
     debug: 2,
     config: {
@@ -64,13 +63,11 @@ const peer = new Peer(null, {
 
 peer.on('open', (id) => { 
     document.getElementById('my-id-code').innerText = id; 
-    console.log("Moje ID vygenerováno:", id);
 });
 
 peer.on('error', (err) => {
-    console.error("PeerJS Error:", err);
-    alert("Chyba spojení: " + err.type + "\nDetail: " + err.message);
-    connectionStatus.innerText = "❌ Chyba: " + err.type;
+    console.error("Peer Error:", err);
+    connectionStatus.innerText = "❌ Chyba sítě: " + err.type;
 });
 
 // HOST
@@ -78,12 +75,11 @@ document.getElementById('create-btn').addEventListener('click', () => {
     myPlayerId = 0;
     document.getElementById('create-btn').disabled = true;
     document.getElementById('my-id-wrapper').classList.remove('hidden');
-    hostStatus.innerText = "Čekám, až se někdo připojí...";
+    hostStatus.innerText = "Čekám na soupeře...";
     
     peer.on('connection', (c) => {
         conn = c;
-        console.log("Někdo se připojuje...");
-        hostStatus.innerText = "Soupeř se připojuje! Čekám na data...";
+        hostStatus.innerText = "Připojeno! Hra začíná...";
         setupConnection();
     });
 });
@@ -91,85 +87,70 @@ document.getElementById('create-btn').addEventListener('click', () => {
 // KLIENT
 document.getElementById('join-btn').addEventListener('click', () => {
     const rawId = document.getElementById('join-input').value.trim();
-    if (!rawId) return alert("Chybí ID!");
-    
-    // Odstranění případných mezer
+    if (!rawId) return alert("Zadej ID!");
     const hostId = rawId.replace(/\s/g, ''); 
 
     myPlayerId = 1;
-    connectionStatus.innerText = "⏳ Připojuji se k ID: " + hostId;
+    connectionStatus.innerText = "⏳ Připojuji se...";
     
-    // Zkusíme se připojit
     conn = peer.connect(hostId);
     
-    // Nastavíme timeout, kdyby to trvalo moc dlouho
-    setTimeout(() => {
-        if (!conn.open) {
-            connectionStatus.innerText = "⚠️ Trvá to dlouho... zkontroluj ID.";
-        }
-    }, 5000);
-
     conn.on('open', () => {
-        console.log("Spojení OTEVŘENO!");
-        connectionStatus.innerText = "✅ Spojeno! Odesílám pozdrav...";
+        connectionStatus.innerText = "✅ Spojeno! Čekej na start...";
         setupConnection();
         setTimeout(() => sendData('HELLO', {}), 500);
     });
 });
 
 function setupConnection() {
-    conn.on('data', (data) => {
-        console.log("Přišla data:", data.type);
-        handleNetworkData(data);
-    });
-    conn.on('close', () => { 
-        alert("Konec spojení se soupeřem."); 
-        location.reload(); 
-    });
-    conn.on('error', (err) => {
-        console.error("Chyba uvnitř spojení:", err);
-        alert("Chyba přenosu dat.");
-    });
+    conn.on('data', (data) => handleNetworkData(data));
+    conn.on('close', () => { alert("Soupeř se odpojil!"); location.reload(); });
 }
 
 function sendData(type, payload) { if (conn && conn.open) conn.send({ type, payload }); }
 
 // ==========================================
-// SYNCHRONIZACE A HRA
+// SYNCHRONIZACE
 // ==========================================
 
 function handleNetworkData(data) {
+    // HOST: Přijal pozdrav od Klienta -> Startuje hru
     if (myPlayerId === 0 && data.type === 'HELLO') {
-        console.log("Host přijal HELLO -> Startuji hru");
         startGameUI();
         resetTurn(0); 
-        sendState();
+        sendState(); // Pošle úvodní stav klientovi
     }
 
+    // KLIENT: Přijal nový stav hry od Hosta -> Překreslí obrazovku
     if (myPlayerId === 1 && data.type === 'STATE_UPDATE') {
         if (gameContainer.classList.contains('hidden')) startGameUI();
         
+        // Aktualizace dat
         PLAYERS = data.payload.players;
         GAME_STATE = data.payload.gameState;
-        
         messageLog.innerHTML = data.payload.logs;
+        
         if (GAME_STATE.currentRoll > 0) diceDisplay.innerText = getDiceIcon(GAME_STATE.currentRoll);
         
+        // Aktualizace grafiky
         updateUI();
-        renderTokens();
+        renderTokens(); // TADY se kreslí figurky u Klienta
         
+        // Pokud jsem Klient a jsem na tahu, zvýrazním si, čím můžu táhnout
         if (GAME_STATE.currentPlayerIndex === 1 && GAME_STATE.turnStep === 'MOVE') {
             const moveable = getMoveableTokens(PLAYERS[1], GAME_STATE.currentRoll);
             highlightTokens(moveable);
         }
     }
 
+    // HOST: Přijímá žádosti od Klienta (Klient klikl na kostku nebo figurku)
     if (myPlayerId === 0) {
         if (data.type === 'REQUEST_ROLL') handleRollLogic();
         if (data.type === 'REQUEST_MOVE') handleMoveLogic(1, data.payload.tokenIdx);
     }
 }
 
+// Hostitel odešle aktuální stav hry Klientovi
 function sendState() {
     if (myPlayerId !== 0) return;
     sendData('STATE_UPDATE', {
@@ -179,7 +160,9 @@ function sendState() {
     });
 }
 
-// ... Zbytek logiky (Board, Move, Rules) zůstává stejný ...
+// ==========================================
+// HERNÍ LOGIKA (Běží jen u HOSTA)
+// ==========================================
 
 function startGameUI() {
     lobbyOverlay.classList.add('hidden');
@@ -191,17 +174,21 @@ function startGameUI() {
 function resetTurn(playerId) {
     const player = PLAYERS[playerId];
     const figuresInPlay = player.tokens.some(t => t !== -1 && t < 100); 
+    
     GAME_STATE.currentPlayerIndex = playerId;
     GAME_STATE.currentRoll = 0;
     GAME_STATE.waitingForMove = false;
     GAME_STATE.turnStep = 'ROLL';
-    GAME_STATE.rollsLeft = figuresInPlay ? 1 : 3;
+    GAME_STATE.rollsLeft = figuresInPlay ? 1 : 3; // Pravidlo 3 hodů
+    
     log(`Na tahu je ${player.name}.`);
     diceDisplay.innerText = "🎲";
+    
     updateUI();
 }
 
 function handleRollLogic() {
+    // Animace kostky
     let i = 0;
     const interval = setInterval(() => {
         diceDisplay.innerText = getDiceIcon(Math.floor(Math.random()*6)+1);
@@ -226,20 +213,24 @@ function finalizeRoll() {
 
     if (moveable.length > 0) {
         GAME_STATE.turnStep = 'MOVE';
+        // Pokud je Host na tahu, zvýrazníme mu figurky hned
         if (GAME_STATE.currentPlayerIndex === 0) highlightTokens(moveable);
     } else {
         if (GAME_STATE.rollsLeft > 0) {
-            log(`Žádný tah. Máš ještě ${GAME_STATE.rollsLeft} pokus(y).`);
+            log(`Žádný tah. Ještě ${GAME_STATE.rollsLeft} pokus(y).`);
             GAME_STATE.turnStep = 'ROLL'; 
         } else {
             log("Žádný tah. Konec kola.");
             setTimeout(nextPlayer, 1500);
         }
     }
-    sendState();
+    
+    // Důležité: Překreslit u Hosta a poslat Klientovi
     updateUI();
+    sendState();
 }
 
+// Tady byla chyba! Hostitel pohnul daty, ale nepřekreslil si to.
 function handleMoveLogic(pid, tokenIdx) {
     if (pid !== GAME_STATE.currentPlayerIndex) return;
     
@@ -249,6 +240,7 @@ function handleMoveLogic(pid, tokenIdx) {
 
     if (!moveable.includes(tokenIdx)) return;
 
+    // 1. Změna pozice (DATA)
     let currentPos = player.tokens[tokenIdx];
     
     if (currentPos === -1) {
@@ -270,6 +262,7 @@ function handleMoveLogic(pid, tokenIdx) {
         }
     }
 
+    // 2. Logika dalšího tahu
     if (roll === 6) {
         log("Padla šestka! Hraješ znovu.");
         resetTurn(pid); 
@@ -277,19 +270,28 @@ function handleMoveLogic(pid, tokenIdx) {
     } else {
         nextPlayer();
     }
-    sendState();
+
+    // 3. OPRAVA: Okamžité překreslení u Hosta a odeslání
+    renderTokens(); // <--- TOTO TU CHYBĚLO! Hostitel si překreslí desku.
+    updateUI();     // Aktualizuje tlačítka
+    sendState();    // Pošle data klientovi, aby si to překreslil i on.
 }
 
 function nextPlayer() {
     const nextPid = GAME_STATE.currentPlayerIndex === 0 ? 1 : 0;
     resetTurn(nextPid);
+    renderTokens(); // Pro jistotu překreslíme i při změně tahu
+    updateUI();
     sendState();
 }
+
+// --- Pomocná logika pravidel ---
 
 function getMoveableTokens(player, roll) {
     let options = [];
     player.tokens.forEach((pos, idx) => {
         if (pos === -1) {
+            // Nasazení (jen při 6)
             if (roll === 6) {
                 if (!isOccupiedBySelf(player.startPos, player.id)) options.push(idx);
             }
@@ -298,11 +300,13 @@ function getMoveableTokens(player, roll) {
             let targetRelative = relativePos + roll;
 
             if (targetRelative >= PATH_LENGTH) {
+                // Do domečku
                 let homeIdx = targetRelative - PATH_LENGTH;
                 if (homeIdx <= 3 && !isOccupiedBySelfInHome(homeIdx, player.id)) {
                     options.push(idx);
                 }
             } else {
+                // Běžný pohyb
                 let targetGlobal = (pos + roll) % PATH_LENGTH;
                 if (!isOccupiedBySelf(targetGlobal, player.id)) {
                     options.push(idx);
@@ -326,6 +330,8 @@ function handleKick(pos, attackerId) {
     });
 }
 
+// --- Interakce ---
+
 rollBtn.addEventListener('click', () => {
     if (GAME_STATE.currentPlayerIndex !== myPlayerId) return;
     if (GAME_STATE.turnStep !== 'ROLL') return;
@@ -342,6 +348,8 @@ function onTokenClick(pid, idx) {
     if (myPlayerId === 0) handleMoveLogic(0, idx);
     else sendData('REQUEST_MOVE', { tokenIdx: idx });
 }
+
+// --- Grafika a Inicializace ---
 
 function initBoard() {
     board.innerHTML = '';
@@ -388,6 +396,7 @@ function renderTokens() {
 function updateUI() {
     p1Card.classList.toggle('active', GAME_STATE.currentPlayerIndex === 0);
     p2Card.classList.toggle('active', GAME_STATE.currentPlayerIndex === 1);
+    
     const isMyTurn = GAME_STATE.currentPlayerIndex === myPlayerId;
     
     if (isMyTurn && GAME_STATE.turnStep === 'ROLL') {
@@ -399,7 +408,7 @@ function updateUI() {
     } else if (isMyTurn && GAME_STATE.turnStep === 'MOVE') {
         rollBtn.disabled = true;
         rollBtn.innerText = "VYBER FIGURKU";
-        rollInfo.innerText = "Klikni na svítící figurku pro pohyb.";
+        rollInfo.innerText = "Klikni na figurku pro pohyb.";
         rollBtn.classList.remove('pulse');
     } else {
         rollBtn.disabled = true;
@@ -415,7 +424,7 @@ function highlightTokens(indices) {
         if (indices.includes(parseInt(t.dataset.idx))) {
             t.classList.add('highlight');
         } else {
-            t.style.opacity = '0.6';
+            t.style.opacity = '0.5';
             t.style.cursor = 'not-allowed';
         }
     });
@@ -441,4 +450,5 @@ function isBase(x,y) { return bases.some(b=>b.x===x && b.y===y); }
 function isOccupiedBySelf(idx, pid) { return PLAYERS[pid].tokens.includes(idx); }
 function isOccupiedBySelfInHome(hIdx, pid) { return PLAYERS[pid].tokens.includes(100+hIdx); }
 
+// Start
 initBoard();
