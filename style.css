@@ -1,222 +1,147 @@
 :root {
-    --bg-color: #FFF5E4; /* Krémová */
-    --board-bg: #FFE3E1; /* Světle růžová */
-    --path-color: #ffffff;
-    --p1-color: #FF9F43; /* Zrzavá kočka */
-    --p2-color: #54a0ff; /* Modrá kočka (nebo šedá britská) */
-    --text-color: #57606f;
-    --shadow: 0 4px 6px rgba(0,0,0,0.1);
+    --bg-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --glass-bg: rgba(255, 255, 255, 0.9);
+    --glass-border: rgba(255, 255, 255, 0.5);
+    --p1-color: #ff9f43;
+    --p1-shadow: #e58e26;
+    --p2-color: #54a0ff;
+    --p2-shadow: #2e86de;
+    --text-dark: #2d3436;
+    --board-bg: #fff;
 }
 
+* { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+
 body {
-    font-family: 'Quicksand', sans-serif;
-    background-color: var(--bg-color);
-    color: var(--text-color);
+    font-family: 'Poppins', sans-serif;
+    background: var(--bg-gradient);
+    min-height: 100vh;
     display: flex;
     justify-content: center;
     align-items: center;
-    min-height: 100vh;
-    margin: 0;
+    color: var(--text-dark);
+    overflow: hidden;
 }
 
-.game-container {
-    text-align: center;
-    max-width: 600px;
-    width: 100%;
-    padding: 20px;
+/* Glassmorphism Utility */
+.glass-panel {
+    background: var(--glass-bg);
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
 }
 
-h1 {
-    font-family: 'Fredoka One', cursive;
-    color: #ff6b6b;
-    text-shadow: 2px 2px 0px #fff;
+.hidden { display: none !important; }
+
+/* LOBBY */
+#lobby-overlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.6);
+    display: flex; justify-content: center; align-items: center; z-index: 100;
+}
+.lobby-box { padding: 40px; text-align: center; width: 100%; max-width: 500px; }
+.lobby-box h1 { font-size: 2.5rem; color: #6c5ce7; margin-bottom: 0; }
+.subtitle { color: #636e72; margin-bottom: 30px; text-transform: uppercase; letter-spacing: 2px; font-size: 0.8rem; }
+.id-box { background: #dfe6e9; padding: 15px; border-radius: 10px; font-family: monospace; font-size: 1.2rem; margin: 10px 0; border: 2px dashed #b2bec3; user-select: all; }
+.divider { margin: 20px 0; color: #b2bec3; font-size: 0.8rem; font-weight: bold; }
+input { width: 100%; padding: 15px; border-radius: 10px; border: 2px solid #dfe6e9; margin-bottom: 10px; font-family: inherit; }
+
+/* BUTTONS */
+.btn-primary, .btn-secondary {
+    border: none; padding: 15px 30px; border-radius: 12px; font-weight: 800; cursor: pointer; transition: transform 0.1s, filter 0.2s; width: 100%; text-transform: uppercase;
+}
+.btn-primary { background: #6c5ce7; color: white; box-shadow: 0 4px 0 #4834d4; }
+.btn-secondary { background: #00cec9; color: white; box-shadow: 0 4px 0 #00b894; }
+.btn-primary:active, .btn-secondary:active { transform: translateY(4px); box-shadow: none; }
+.btn-primary:disabled { background: #b2bec3; box-shadow: none; cursor: not-allowed; }
+
+/* GAME LAYOUT */
+#game-container {
+    display: grid;
+    grid-template-columns: 250px auto 250px;
+    gap: 20px;
+    width: 95%;
+    max-width: 1400px;
+    height: 90vh;
 }
 
-/* Herní deska */
-.board-wrapper {
-    background: var(--board-bg);
-    padding: 15px;
-    border-radius: 25px;
-    box-shadow: var(--shadow);
-    display: inline-block;
-    margin: 20px 0;
-    border: 4px solid #fff;
+/* SIDE PANELS */
+.info-panel, .control-panel {
+    padding: 20px; display: flex; flex-direction: column; gap: 15px;
 }
 
+.player-card {
+    background: rgba(255,255,255,0.5); padding: 15px; border-radius: 15px; display: flex; align-items: center; gap: 10px; transition: all 0.3s; border: 3px solid transparent;
+}
+.player-card.active { background: white; transform: scale(1.05); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+.player-card.p1.active { border-color: var(--p1-color); }
+.player-card.p2.active { border-color: var(--p2-color); }
+
+.avatar { font-size: 2rem; background: #eee; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+.turn-indicator { display: none; font-size: 0.7rem; background: #fab1a0; padding: 2px 6px; border-radius: 4px; color: white; font-weight: bold; }
+.active .turn-indicator { display: block; }
+
+/* BOARD */
+.board-container { display: flex; justify-content: center; align-items: center; }
+.board-frame { padding: 20px; background: white; border-radius: 30px; }
 #game-board {
     display: grid;
-    grid-template-columns: repeat(11, 30px);
-    grid-template-rows: repeat(11, 30px);
-    gap: 4px;
+    grid-template-columns: repeat(11, 40px);
+    grid-template-rows: repeat(11, 40px);
+    gap: 6px;
 }
 
 .cell {
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    background-color: var(--path-color);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    font-size: 18px;
-    position: relative;
-    transition: all 0.2s ease;
+    width: 40px; height: 40px; border-radius: 50%; background: #f1f2f6; border: 2px solid transparent; position: relative;
+    display: flex; justify-content: center; align-items: center; transition: all 0.2s;
 }
 
-/* Speciální políčka */
-.cell.start-p1 { border: 2px solid var(--p1-color); }
-.cell.start-p2 { border: 2px solid var(--p2-color); }
-.cell.home-p1 { background-color: #ffeaa7; } /* Cestička do domečku */
-.cell.home-p2 { background-color: #74b9ff; }
+/* Cesty a barvy */
+.cell.start-p1 { border-color: var(--p1-color); background: #ffeaa7; }
+.cell.start-p2 { border-color: var(--p2-color); background: #74b9ff; }
+.cell.home-p1 { background: #ffeaa7; border: 2px solid var(--p1-color); }
+.cell.home-p2 { background: #74b9ff; border: 2px solid var(--p2-color); }
+.cell.base { background: rgba(0,0,0,0.03); border: 2px dashed #dfe6e9; }
 
-.cell.base {
-    background-color: rgba(0,0,0,0.05);
-}
-
-/* Figurky (Kočičí hlavy) */
+/* TOKENS */
 .token {
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    border: 2px solid white;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    width: 32px; height: 32px; border-radius: 50%; border: 3px solid white; cursor: pointer; z-index: 10;
+    display: flex; justify-content: center; align-items: center; font-size: 18px;
+    box-shadow: 0 3px 5px rgba(0,0,0,0.2); transition: transform 0.2s;
+}
+.token.p1 { background: var(--p1-color); box-shadow: 0 4px 0 var(--p1-shadow); }
+.token.p1::after { content: "🐱"; font-size: 16px; }
+.token.p2 { background: var(--p2-color); box-shadow: 0 4px 0 var(--p2-shadow); }
+.token.p2::after { content: "😼"; font-size: 16px; }
+
+/* Animace pohybu */
+.token.highlight {
+    animation: bounce 1s infinite;
+    filter: brightness(1.2);
     cursor: pointer;
-    transition: transform 0.2s;
-    z-index: 10;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    font-size: 14px;
+    border: 3px solid #fff;
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.8), 0 4px 0 rgba(0,0,0,0.2);
 }
 
-.token:hover {
-    transform: scale(1.2);
+@keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
 }
 
-.token.p1 {
-    background-color: var(--p1-color);
+/* CONTROLS */
+.dice-box { text-align: center; margin-bottom: 20px; }
+.dice { font-size: 4rem; height: 80px; line-height: 80px; }
+#roll-info { font-size: 0.9rem; color: #636e72; min-height: 20px; }
+.big-action { font-size: 1.2rem; padding: 20px; }
+.log-box { background: rgba(0,0,0,0.05); padding: 15px; border-radius: 10px; flex-grow: 1; overflow-y: auto; font-size: 0.85rem; margin-top: 10px; }
+.log-box h3 { font-size: 0.9rem; margin-bottom: 10px; color: #636e72; text-transform: uppercase; }
+
+/* Responsive */
+@media (max-width: 900px) {
+    #game-container { grid-template-columns: 1fr; grid-template-rows: auto auto auto; height: auto; }
+    #game-board { grid-template-columns: repeat(11, 30px); grid-template-rows: repeat(11, 30px); gap: 3px; }
+    .cell { width: 30px; height: 30px; }
+    .token { width: 24px; height: 24px; font-size: 12px; }
+    .token.p1::after, .token.p2::after { font-size: 12px; }
 }
-.token.p1::after { content: "🐱"; font-size: 14px; }
-
-.token.p2 {
-    background-color: var(--p2-color);
-}
-.token.p2::after { content: "😼"; font-size: 14px; }
-
-/* Ovládání */
-.controls {
-    background: white;
-    padding: 15px;
-    border-radius: 15px;
-    box-shadow: var(--shadow);
-}
-
-.dice {
-    font-size: 40px;
-    margin-bottom: 10px;
-    height: 50px;
-}
-
-button {
-    background-color: #ff6b6b;
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 20px;
-    font-family: 'Fredoka One', cursive;
-    font-size: 18px;
-    cursor: pointer;
-    transition: transform 0.1s;
-}
-
-button:active {
-    transform: scale(0.95);
-}
-
-button:disabled {
-    background-color: #ccc;
-    cursor: not-allowed;
-}
-
-.player-orange { color: var(--p1-color); font-weight: bold; }
-.player-blue { color: var(--p2-color); font-weight: bold; }
-
-#message-log {
-    margin-top: 10px;
-    font-style: italic;
-    font-size: 0.9em;
-    min-height: 20px;
-}
-
-/* Zvýraznění pohybu */
-.highlight {
-    animation: pulse 1.5s infinite;
-    cursor: pointer;
-    background-color: #fab1a0 !important; 
-}
-
-@keyframes pulse {
-    0% { transform: scale(0.9); }
-    50% { transform: scale(1.1); }
-    100% { transform: scale(0.9); }
-}
-
-
-
-/* Styly pro Lobby */
-#lobby-overlay {
-    position: fixed;
-    top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.8);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 100;
-}
-
-.lobby-box {
-    background: white;
-    padding: 30px;
-    border-radius: 20px;
-    text-align: center;
-    max-width: 400px;
-    width: 90%;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-}
-
-.big-btn {
-    width: 100%;
-    margin: 10px 0;
-    padding: 15px;
-    font-size: 1.1em;
-}
-
-.big-btn.blue {
-    background-color: var(--p2-color);
-}
-
-#my-id-code {
-    display: block;
-    background: #eee;
-    padding: 10px;
-    font-family: monospace;
-    font-size: 1.2em;
-    letter-spacing: 1px;
-    margin: 10px 0;
-    border-radius: 5px;
-    user-select: all; /* Usnadní kopírování */
-    border: 2px dashed #ccc;
-}
-
-.small { font-size: 0.8em; color: #888; }
-
-#player-identity {
-    font-size: 0.9em;
-    margin-top: 5px;
-    padding: 5px;
-    background: rgba(255,255,255,0.5);
-    border-radius: 10px;
-    display: inline-block;
-}
-
-#connection-status { font-weight: bold; color: #ff6b6b; }
