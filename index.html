@@ -2,90 +2,92 @@
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Royal Cats Ludo</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Royal Cats Ludo ⚡</title>
     <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&family=Poppins:wght@400;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
 </head>
 <body>
 
-    <!-- ONLINE LOBBY -->
+    <!-- ONLINE LOBBY (Zůstává, jen hezčí) -->
     <div id="lobby-overlay">
-        <div class="glass-panel lobby-box">
-            <h1>🐱 Royal Cats Ludo 👑</h1>
-            <p class="subtitle">Profesionální edice</p>
+        <div class="lobby-card glass-morphism">
+            <h1>🐱 Royal Cats 👑</h1>
+            <p class="subtitle">Mobile Pro Edition</p>
             
-            <div class="lobby-controls">
-                <div class="host-section">
-                    <button id="create-btn" class="btn-primary">👑 Založit hru (Host)</button>
-                    <div id="my-id-wrapper" class="hidden">
-                        <p>Tvoje ID hry:</p>
-                        <div class="id-box" id="my-id-code">Generuji...</div>
-                        <p class="status-msg" id="host-status">Čekám na soupeře...</p>
-                    </div>
-                </div>
+            <div class="lobby-content">
+                <button id="create-btn" class="btn-lobby primary">👑 Založit Hru</button>
                 
+                <div id="my-id-wrapper" class="hidden fade-in">
+                    <p>Pošli toto ID kamarádovi:</p>
+                    <div class="id-box" id="my-id-code">Načítám...</div>
+                    <p class="status-text blink" id="host-status">Čekám na soupeře...</p>
+                </div>
+
                 <div class="divider"><span>NEBO</span></div>
 
                 <div class="join-section">
                     <input type="text" id="join-input" placeholder="Vlož ID soupeře...">
-                    <button id="join-btn" class="btn-secondary">🚀 Připojit se</button>
+                    <button id="join-btn" class="btn-lobby secondary">🚀 Připojit se</button>
                 </div>
+                <p id="connection-status" class="status-footer"></p>
             </div>
-            <p id="connection-status"></p>
         </div>
     </div>
 
-    <!-- HERNÍ PLOCHA -->
+    <!-- HERNÍ ROZHRANÍ -->
     <main id="game-container" class="hidden">
         
-        <!-- Levý panel: Info o hráčích -->
-        <aside class="info-panel glass-panel">
-            <div class="player-card p1 active" id="p1-card">
+        <!-- Horní lišta: Skóre a Status -->
+        <header class="game-header">
+            <div class="player-badge p1" id="p1-card">
                 <div class="avatar">🐱</div>
-                <div class="details">
-                    <h3>Zrzek</h3>
-                    <p>Hostitel</p>
+                <div class="info">
+                    <span class="name">Zrzek</span>
+                    <span class="status-dot"></span>
                 </div>
-                <div class="turn-indicator">NA TAHU</div>
             </div>
 
-            <div class="game-info">
-                <h2>VS</h2>
+            <div class="turn-info">
+                <span id="game-status-text">Čekání na hru...</span>
             </div>
 
-            <div class="player-card p2" id="p2-card">
+            <div class="player-badge p2" id="p2-card">
+                <div class="info">
+                    <span class="name">Modrák</span>
+                    <span class="status-dot"></span>
+                </div>
                 <div class="avatar">😼</div>
-                <div class="details">
-                    <h3>Modrák</h3>
-                    <p>Host</p>
-                </div>
-                <div class="turn-indicator">NA TAHU</div>
             </div>
-        </aside>
+        </header>
 
-        <!-- Střed: Deska -->
-        <section class="board-container">
-            <div class="board-frame glass-panel">
+        <!-- Herní plocha -->
+        <section class="board-wrapper">
+            <div class="board-frame glass-morphism">
                 <div id="game-board"></div>
             </div>
         </section>
 
-        <!-- Pravý panel: Ovládání a Chat -->
-        <aside class="control-panel glass-panel">
-            <div class="dice-box">
-                <div id="dice" class="dice">🎲</div>
-                <div id="roll-info">Čeká se na hod...</div>
+        <!-- Dolní lišta: Ovládání -->
+        <footer class="game-controls glass-morphism">
+            <div class="dice-container">
+                <div id="dice-cube" class="dice-cube">
+                    <div class="face front">?</div>
+                    <div class="face back">?</div>
+                    <div class="face right">?</div>
+                    <div class="face left">?</div>
+                    <div class="face top">?</div>
+                    <div class="face bottom">?</div>
+                </div>
             </div>
             
-            <button id="roll-btn" class="btn-primary big-action">HODIT KOSTKOU</button>
-            
-            <div class="log-box">
-                <h3>Hlášení</h3>
-                <div id="message-log">Vítejte ve hře!</div>
+            <div class="action-area">
+                <div id="powerup-indicator" class="hidden">⚡ 2x BOOST!</div>
+                <button id="roll-btn" class="btn-action">HODIT KOSTKOU</button>
+                <p id="roll-info">Jsi na tahu!</p>
             </div>
-        </aside>
+        </footer>
 
     </main>
 
