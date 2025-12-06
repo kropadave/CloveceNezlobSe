@@ -1,6 +1,6 @@
-console.log("Royal Cats Ludo v6.0 - Final Fixes");
+console.log("Royal Cats & Mouse v7.0 - Final Edition");
 
-// --- UI Elementy ---
+// --- UI Elements ---
 const board = document.getElementById('game-board');
 const rollBtn = document.getElementById('roll-btn');
 const diceCube = document.getElementById('dice-cube');
@@ -18,25 +18,27 @@ const p2Card = document.getElementById('p2-card');
 const BOARD_SIZE = 11;
 const PATH_LENGTH = 40;
 
-// Definice hráčů
+// Hráči
 let PLAYERS = [
-    { id: 0, name: 'Zrzek', class: 'p1', startPos: 0, tokens: [-1, -1, -1, -1], baseIndices: [0, 1, 2, 3] },
-    { id: 1, name: 'Modrák', class: 'p2', startPos: 20, tokens: [-1, -1, -1, -1], baseIndices: [4, 5, 6, 7] }
+    { id: 0, name: 'Pinky', class: 'p1', startPos: 0, tokens: [-1, -1, -1, -1], baseIndices: [0, 1, 2, 3] },
+    { id: 1, name: 'Brain', class: 'p2', startPos: 20, tokens: [-1, -1, -1, -1], baseIndices: [4, 5, 6, 7] }
 ];
 
 let GAME_STATE = {
     currentPlayerIndex: 0,
-    currentRoll: 1, // Startujeme na 1, aby kostka nebyla rozbitá
+    currentRoll: 1,
     waitingForMove: false,
     rollsLeft: 1, 
     turnStep: 'ROLL',
-    teleportAvailable: false // Pro mega-combo
+    teleportAvailable: false 
 };
 
 let myPlayerId = null; 
 let conn = null; 
 
-// --- Mapy a Cesty ---
+// --- MAPA (Klikatá pro zajímavost) ---
+// Tvar cesty: Start vlevo dole, jde nahoru, doprava, dolů...
+// Tohle je jen reprezentace v gridu 11x11
 const pathMap = [
     {x:4, y:10}, {x:4, y:9}, {x:4, y:8}, {x:4, y:7}, {x:4, y:6}, {x:3, y:6}, {x:2, y:6}, {x:1, y:6}, {x:0, y:6}, 
     {x:0, y:5}, {x:0, y:4}, {x:1, y:4}, {x:2, y:4}, {x:3, y:4}, {x:4, y:4}, {x:4, y:3}, {x:4, y:2}, {x:4, y:1}, {x:4, y:0},
@@ -47,36 +49,35 @@ const pathMap = [
 const homePaths = [[{x:5, y:9}, {x:5, y:8}, {x:5, y:7}, {x:5, y:6}], [{x:5, y:1}, {x:5, y:2}, {x:5, y:3}, {x:5, y:4}]];
 const bases = [{x:0, y:10}, {x:1, y:10}, {x:0, y:9}, {x:1, y:9}, {x:9, y:1}, {x:10, y:1}, {x:9, y:0}, {x:10, y:0}];
 
-// ⚡ Specialní políčka (Power-ups)
-const SPECIAL_TILES = [5, 15, 25, 35, 10, 30]; 
+// ⚡ Boost Políčka
+const SPECIAL_TILES = [5, 15, 25, 35, 12, 32]; 
 
 // ==========================================
-// SÍŤOVÁ ČÁST
+// SÍŤ
 // ==========================================
 const peer = new Peer(null, { debug: 1 });
 
 peer.on('open', (id) => { document.getElementById('my-id-code').innerText = id; });
 peer.on('error', (err) => { alert("Chyba sítě: " + err.type); });
-peer.on('disconnected', () => peer.reconnect());
 
 document.getElementById('create-btn').addEventListener('click', () => {
     myPlayerId = 0;
     document.getElementById('create-btn').disabled = true;
     document.getElementById('my-id-wrapper').classList.remove('hidden');
-    hostStatus.innerText = "Čekám na soupeře...";
+    hostStatus.innerText = "Čekám na Myšáka...";
     peer.on('connection', (c) => { conn = c; setupConnection(); });
 });
 
 document.getElementById('join-btn').addEventListener('click', () => {
     const rawId = document.getElementById('join-input').value.trim().replace(/\s/g, '');
-    if (!rawId) return alert("Zadej ID!");
+    if (!rawId) return alert("Zadej kód!");
     myPlayerId = 1;
-    connectionStatus.innerText = "⏳ Připojuji...";
+    connectionStatus.innerText = "Hledám...";
     conn = peer.connect(rawId, { reliable: true });
     conn.on('open', () => {
-        connectionStatus.innerText = "✅ Spojeno!";
+        connectionStatus.innerText = "Spojeno!";
         setupConnection();
-        setTimeout(() => sendData('HELLO', {}), 1000);
+        setTimeout(() => sendData('HELLO', {}), 500);
     });
 });
 
@@ -87,7 +88,7 @@ function setupConnection() {
 function sendData(type, payload) { if (conn && conn.open) conn.send({ type, payload }); }
 
 // ==========================================
-// UPDATE LOGIKA
+// SYNC & UPDATE
 // ==========================================
 
 function handleNetworkData(data) {
@@ -98,13 +99,9 @@ function handleNetworkData(data) {
     }
     if (myPlayerId === 1 && data.type === 'STATE_UPDATE') {
         if (document.getElementById('game-container').classList.contains('hidden')) startGameUI();
-        
         PLAYERS = data.payload.players;
         GAME_STATE = data.payload.gameState;
-        
-        // Zde jen aktualizujeme vizuál kostky, aby seděl na číslo, ale NERESETUJEME rotaci
         updateDiceVisual(GAME_STATE.currentRoll);
-
         updateUI();
         renderTokens();
         
@@ -126,14 +123,14 @@ function sendState() {
 }
 
 // ==========================================
-// HERNÍ LOGIKA (HOST)
+// GAME LOGIC (HOST)
 // ==========================================
 
 function startGameUI() {
     lobbyOverlay.classList.add('hidden');
     document.getElementById('game-container').classList.remove('hidden');
     initBoard();
-    updateDiceVisual(1); // Nastavíme kostku na 1 při startu
+    updateDiceVisual(1);
     updateUI();
 }
 
@@ -142,37 +139,39 @@ function resetTurn(playerId) {
     const figuresInPlay = player.tokens.some(t => t !== -1 && t < 100); 
     
     GAME_STATE.currentPlayerIndex = playerId;
-    // Neresetujeme currentRoll na 0, necháme tam poslední číslo (vizuálně hezčí)
     GAME_STATE.waitingForMove = false;
     GAME_STATE.turnStep = 'ROLL';
     GAME_STATE.rollsLeft = figuresInPlay ? 1 : 3;
     GAME_STATE.teleportAvailable = false;
 
-    // Check na Teleport (Mega-Combo)
-    // Pokud má hráč 2 a více figurek na speciálních políčkách, aktivuje se možnost teleportu pro třetí figurku
+    // --- MEGA COMBO LOGIKA ---
+    // Hráč má 2 a více figurek na boostech...
     const tokensOnSpecial = player.tokens.filter(t => t !== -1 && t < 100 && SPECIAL_TILES.includes(t % PATH_LENGTH)).length;
-    if (tokensOnSpecial >= 2) {
+    // ... A ZÁROVEŇ má ještě nějakou JINOU figurku, která je ve hře (tzn. ne v domečku, ne na startu), kterou by mohl teleportovat.
+    const tokensAvailableToTeleport = player.tokens.some(t => t !== -1 && t < 100 && !SPECIAL_TILES.includes(t % PATH_LENGTH));
+    
+    // Podmínka: 2x boost + 3. figurka k dispozici
+    if (tokensOnSpecial >= 2 && tokensAvailableToTeleport) {
         GAME_STATE.teleportAvailable = true;
     }
 
-    statusText.innerText = `Na tahu: ${player.name}`;
+    statusText.innerText = "VS"; // Reset textu
     updateUI();
 }
 
 function handleRollLogic() {
     let roll = Math.floor(Math.random() * 6) + 1;
-    
-    // Rychlá animace
+    // Rychlejší animace (jen 5 otočení)
     let rotations = 0;
     let interval = setInterval(() => {
         let tempRoll = Math.floor(Math.random() * 6) + 1;
-        updateDiceVisual(tempRoll); // Jen točíme, neukládáme do State
+        updateDiceVisual(tempRoll); 
         rotations++;
-        if(rotations > 10) {
+        if(rotations > 5) {
             clearInterval(interval);
             finalizeRoll(roll);
         }
-    }, 80);
+    }, 60);
 }
 
 function finalizeRoll(roll) {
@@ -181,8 +180,6 @@ function finalizeRoll(roll) {
 
     const player = PLAYERS[GAME_STATE.currentPlayerIndex];
     const moveable = getMoveableTokens(player, roll);
-
-    // Aktualizace vizuálu kostky na finální číslo
     updateDiceVisual(roll);
 
     if (moveable.length > 0) {
@@ -195,10 +192,9 @@ function finalizeRoll(roll) {
         if (GAME_STATE.rollsLeft > 0) {
             GAME_STATE.turnStep = 'ROLL'; 
         } else {
-            setTimeout(nextPlayer, 1500);
+            setTimeout(nextPlayer, 1000);
         }
     }
-    
     updateUI();
     sendState();
 }
@@ -210,42 +206,54 @@ function handleMoveLogic(pid, tokenIdx) {
     const roll = GAME_STATE.currentRoll;
     let currentPos = player.tokens[tokenIdx];
     
-    // 1. TELEPORT LOGIKA (Mega-Combo)
-    // Pokud je aktivní teleport a hráč vybral figurku, která NENÍ v domečku a NENÍ na startu
-    if (GAME_STATE.teleportAvailable && currentPos !== -1 && currentPos < 100) {
-        // Teleportovat rovnou před domeček? Ne, zadání bylo "do domečku".
-        // Uděláme to tak, že skočí na první políčko domečku.
-        player.tokens[tokenIdx] = 100; // 100 = první políčko domečku
-        GAME_STATE.teleportAvailable = false; // Vyčerpáno
+    // 1. TELEPORT AKCE
+    // Pokud je aktivní, hráč musí vybrat figurku, která NENÍ na boostu (to by nedávalo smysl)
+    if (GAME_STATE.teleportAvailable && currentPos !== -1 && currentPos < 100 && !SPECIAL_TILES.includes(currentPos % PATH_LENGTH)) {
+        player.tokens[tokenIdx] = 100; // Skok na start domečku
+        GAME_STATE.teleportAvailable = false;
         checkWin(player);
         nextPlayer();
-        return; 
+        return;
     }
 
-    // 2. BOOST LOGIKA (Lokální)
-    // Zjistíme, jestli TATO figurka stojí na blesku
+    // 2. BOOST
     let multiplier = 1;
     if (currentPos !== -1 && currentPos < 100 && SPECIAL_TILES.includes(currentPos % PATH_LENGTH)) {
         multiplier = 2;
     }
-
     const effectiveRoll = roll * multiplier;
 
-    // Standardní pohyb
+    // 3. POHYB
     if (currentPos === -1) {
-        // Nasazení (jen čistá 6)
-        if (roll === 6) {
+        if (roll === 6) { // Nasazení
             player.tokens[tokenIdx] = player.startPos;
             handleKick(player.startPos, pid);
         }
+    } else if (currentPos >= 100) {
+        // POHYB V DOMEČKU
+        // 100, 101, 102, 103 jsou políčka domečku
+        let currentHomeIdx = currentPos - 100;
+        let targetHomeIdx = currentHomeIdx + roll; // Zde není multiplier, v domečku neplatí
+
+        // Musí se vejít do domečku (max index 3) a nesmí tam nikdo být
+        if (targetHomeIdx <= 3 && !isOccupiedBySelfInHome(targetHomeIdx, pid)) {
+             player.tokens[tokenIdx] = 100 + targetHomeIdx;
+             checkWin(player);
+        }
     } else {
+        // POHYB NA MAPĚ
         let relativePos = (currentPos - player.startPos + PATH_LENGTH) % PATH_LENGTH;
         let targetRelative = relativePos + effectiveRoll;
         
         if (targetRelative >= PATH_LENGTH) {
-            player.tokens[tokenIdx] = 100 + (targetRelative - PATH_LENGTH);
-            checkWin(player);
+            // Vstup do domečku
+            let homeIdx = targetRelative - PATH_LENGTH;
+            if (homeIdx <= 3 && !isOccupiedBySelfInHome(homeIdx, pid)) {
+                player.tokens[tokenIdx] = 100 + homeIdx;
+                checkWin(player);
+            }
         } else {
+            // Klasický posun
             let newPos = (currentPos + effectiveRoll) % PATH_LENGTH;
             player.tokens[tokenIdx] = newPos;
             handleKick(newPos, pid);
@@ -253,14 +261,12 @@ function handleMoveLogic(pid, tokenIdx) {
     }
 
     clearHints();
-
     if (roll === 6) {
         resetTurn(pid); 
         GAME_STATE.rollsLeft = 1; 
     } else {
         nextPlayer();
     }
-
     renderTokens();
     updateUI();
     sendState();
@@ -280,31 +286,31 @@ function nextPlayer() {
 function getMoveableTokens(player, roll) {
     let options = [];
     player.tokens.forEach((pos, idx) => {
-        // Speciální pravidlo pro TELEPORT
-        if (GAME_STATE.teleportAvailable && pos !== -1 && pos < 100) {
-            options.push(idx); // Můžu pohnout jakoukoliv figurkou na ploše do domečku
-            return;
+        // Teleport
+        if (GAME_STATE.teleportAvailable && pos !== -1 && pos < 100 && !SPECIAL_TILES.includes(pos % PATH_LENGTH)) {
+            options.push(idx); return;
         }
 
-        // Zjistíme multiplier pro tuto konkrétní figurku
-        let multiplier = 1;
-        if (pos !== -1 && pos < 100 && SPECIAL_TILES.includes(pos % PATH_LENGTH)) {
-            multiplier = 2;
-        }
-        let effectiveRoll = roll * multiplier;
+        let multiplier = (pos !== -1 && pos < 100 && SPECIAL_TILES.includes(pos % PATH_LENGTH)) ? 2 : 1;
+        let effective = roll * multiplier;
 
         if (pos === -1) {
-            // Nasazení (vždy čistá 6)
             if (roll === 6 && !isOccupiedBySelf(player.startPos, player.id)) options.push(idx);
-        } else if (pos < 100) {
+        } else if (pos >= 100) {
+            // Logika v domečku
+            let currentHomeIdx = pos - 100;
+            let targetHomeIdx = currentHomeIdx + roll; // Bez multiplieru
+            if (targetHomeIdx <= 3 && !isOccupiedBySelfInHome(targetHomeIdx, player.id)) {
+                options.push(idx);
+            }
+        } else {
+            // Logika na mapě
             let relativePos = (pos - player.startPos + PATH_LENGTH) % PATH_LENGTH;
-            let targetRelative = relativePos + effectiveRoll;
-
-            if (targetRelative >= PATH_LENGTH) {
-                let homeIdx = targetRelative - PATH_LENGTH;
+            if (relativePos + effective >= PATH_LENGTH) {
+                let homeIdx = (relativePos + effective) - PATH_LENGTH;
                 if (homeIdx <= 3 && !isOccupiedBySelfInHome(homeIdx, player.id)) options.push(idx);
             } else {
-                let targetGlobal = (pos + effectiveRoll) % PATH_LENGTH;
+                let targetGlobal = (pos + effective) % PATH_LENGTH;
                 if (!isOccupiedBySelf(targetGlobal, player.id)) options.push(idx);
             }
         }
@@ -316,15 +322,13 @@ function handleKick(pos, attackerId) {
     PLAYERS.forEach(p => {
         if (p.id !== attackerId) {
             p.tokens.forEach((t, idx) => {
-                if (t === pos) {
-                    p.tokens[idx] = -1; 
-                }
+                if (t === pos) p.tokens[idx] = -1; 
             });
         }
     });
 }
 
-// --- Grafika a Interakce ---
+// --- Grafika ---
 
 function initBoard() {
     board.innerHTML = '';
@@ -336,12 +340,13 @@ function initBoard() {
             
             const pIdx = pathMap.findIndex(p=>p.x===x && p.y===y);
             if (pIdx !== -1) {
+                cell.classList.add('path');
                 if (pIdx===0) cell.classList.add('start-p1');
                 else if (pIdx===20) cell.classList.add('start-p2');
                 else if (SPECIAL_TILES.includes(pIdx)) cell.classList.add('special');
             } else if (isHome(x,y,0)) cell.classList.add('home-p1');
             else if (isHome(x,y,1)) cell.classList.add('home-p2');
-            else if (isBase(x,y)) cell.classList.add('base');
+            else if (isBase(x,y)) cell.classList.add('base'); // Base nemá styl, je neviditelná
             else cell.style.visibility = 'hidden';
             
             board.appendChild(cell);
@@ -355,6 +360,8 @@ function renderTokens() {
     PLAYERS.forEach(player => {
         player.tokens.forEach((pos, idx) => {
             let cell;
+            if (pos === -1) cell = null; // Base se nekreslí na mapě, figurky budou u jmen (viz UI update) - ZJEDNODUŠENÍ: Necháme je zatím zmizelé, nebo je vykreslíme mimo.
+            // PRO JEDNODUCHOST: Necháme je v invisible "base" políčkách, která jsme vytvořili.
             if (pos === -1) cell = getCell(bases[player.baseIndices[idx]]);
             else if (pos >= 100) cell = getCell(homePaths[player.id][pos-100]);
             else cell = getCell(pathMap[pos % PATH_LENGTH]);
@@ -363,12 +370,10 @@ function renderTokens() {
                 const t = document.createElement('div');
                 t.classList.add('token', player.class);
                 t.dataset.idx = idx;
-                
-                // Přidání efektu nabití, pokud stojí na speciálním políčku
+                // Charged efekt
                 if (pos !== -1 && pos < 100 && SPECIAL_TILES.includes(pos % PATH_LENGTH)) {
                     t.classList.add('charged');
                 }
-
                 t.onclick = () => onTokenClick(player.id, idx);
                 cell.appendChild(t);
             }
@@ -377,9 +382,7 @@ function renderTokens() {
 }
 
 function updateDiceVisual(n) {
-    // Pokud n není validní (např. 0), necháme to být
     if (!n || n < 1) return;
-
     const rotations = {
         1: 'rotateX(0deg) rotateY(0deg)',
         2: 'rotateX(0deg) rotateY(180deg)',
@@ -389,40 +392,32 @@ function updateDiceVisual(n) {
         6: 'rotateX(90deg) rotateY(0deg)'
     };
     diceCube.style.transform = rotations[n];
-    
-    document.querySelector('.front').innerText = "1";
-    document.querySelector('.back').innerText = "2";
-    document.querySelector('.right').innerText = "3";
-    document.querySelector('.left').innerText = "4";
-    document.querySelector('.top').innerText = "5";
-    document.querySelector('.bottom').innerText = "6";
 }
 
 function updateUI() {
     p1Card.classList.toggle('active', GAME_STATE.currentPlayerIndex === 0);
     p2Card.classList.toggle('active', GAME_STATE.currentPlayerIndex === 1);
     
-    // Zobrazení boost infa
-    if (GAME_STATE.teleportAvailable) {
+    // Zobrazení boost infa JEN PRO AKTIVNÍHO HRÁČE
+    const isMyTurn = GAME_STATE.currentPlayerIndex === myPlayerId;
+    if (GAME_STATE.teleportAvailable && isMyTurn) {
         powerupIndicator.classList.remove('hidden');
-        powerupIndicator.innerText = "🌀 TELEPORT PŘIPRAVEN!";
+        powerupIndicator.innerText = "🌀 TELEPORT!";
     } else {
         powerupIndicator.classList.add('hidden');
     }
 
-    const isMyTurn = GAME_STATE.currentPlayerIndex === myPlayerId;
-    
     if (isMyTurn) {
         if (GAME_STATE.turnStep === 'ROLL') {
             rollBtn.disabled = false;
-            rollBtn.innerHTML = `HODIT<br><span class="small">Pokusů: ${GAME_STATE.rollsLeft}</span>`;
+            rollBtn.innerHTML = `HODIT <span class="small">${GAME_STATE.rollsLeft} pokus</span>`;
         } else {
             rollBtn.disabled = true;
-            rollBtn.innerHTML = `HRAJ<br><span class="small">Vyber figurku</span>`;
+            rollBtn.innerHTML = `HRAJ <span class="small">Vyber figurku</span>`;
         }
     } else {
         rollBtn.disabled = true;
-        rollBtn.innerHTML = `ČEKEJ<br><span class="small">Soupeř hraje</span>`;
+        rollBtn.innerHTML = `ČEKEJ <span class="small">Soupeř hraje</span>`;
     }
 }
 
@@ -431,57 +426,47 @@ function showHints(tokenIndices, roll) {
     const player = PLAYERS[GAME_STATE.currentPlayerIndex];
     
     tokenIndices.forEach(idx => {
-        // Pokud je aktivní teleport, zvýrazníme domeček jako cíl
-        if (GAME_STATE.teleportAvailable) {
+        // Teleport hint = první pole domečku
+        if (GAME_STATE.teleportAvailable && !SPECIAL_TILES.includes(player.tokens[idx] % PATH_LENGTH)) {
             let homeStart = getCell(homePaths[player.id][0]);
             if(homeStart) homeStart.classList.add('target-hint');
             return;
         }
 
         const pos = player.tokens[idx];
-        
-        // Zjistit multiplier pro nápovědu
-        let multiplier = 1;
-        if (pos !== -1 && pos < 100 && SPECIAL_TILES.includes(pos % PATH_LENGTH)) {
-            multiplier = 2;
-        }
+        let multiplier = (pos !== -1 && pos < 100 && SPECIAL_TILES.includes(pos % PATH_LENGTH)) ? 2 : 1;
         let effective = roll * multiplier;
-
+        
         let targetCell = null;
         if (pos === -1) {
             targetCell = getCell(pathMap[player.startPos]);
-        } else if (pos < 100) {
-            let targetGlobal = (pos + effective) % PATH_LENGTH;
+        } else if (pos >= 100) {
+            let targetH = (pos - 100) + roll;
+            if(targetH <= 3) targetCell = getCell(homePaths[player.id][targetH]);
+        } else {
             let relativePos = (pos - player.startPos + PATH_LENGTH) % PATH_LENGTH;
             if (relativePos + effective >= PATH_LENGTH) {
-                let homeIdx = (relativePos + effective) - PATH_LENGTH;
-                if (homeIdx < 4) targetCell = getCell(homePaths[player.id][homeIdx]);
+                let h = (relativePos + effective) - PATH_LENGTH;
+                if (h <= 3) targetCell = getCell(homePaths[player.id][h]);
             } else {
-                targetCell = getCell(pathMap[targetGlobal]);
+                targetCell = getCell(pathMap[(pos + effective) % PATH_LENGTH]);
             }
         }
-        
         if (targetCell) targetCell.classList.add('target-hint');
     });
 }
 
-function clearHints() {
-    document.querySelectorAll('.target-hint').forEach(el => el.classList.remove('target-hint'));
-}
-
+function clearHints() { document.querySelectorAll('.target-hint').forEach(el => el.classList.remove('target-hint')); }
 function highlightTokens(indices) {
     const pClass = PLAYERS[GAME_STATE.currentPlayerIndex].class;
     document.querySelectorAll(`.token.${pClass}`).forEach(t => {
-        if (indices.includes(parseInt(t.dataset.idx))) {
-            t.classList.add('highlight');
-        } else {
-            t.style.opacity = '0.4';
-        }
+        if (indices.includes(parseInt(t.dataset.idx))) t.classList.add('highlight');
+        else t.style.opacity = '0.4';
     });
 }
 
-// --- Helpers ---
-function getCell(coords) { return document.querySelector(`.cell[data-x="${coords.x}"][data-y="${coords.y}"]`); }
+// Helpers
+function getCell(c) { return document.querySelector(`.cell[data-x="${c.x}"][data-y="${c.y}"]`); }
 function isHome(x,y,pid) { return homePaths[pid].some(p=>p.x===x && p.y===y); }
 function isBase(x,y) { return bases.some(b=>b.x===x && b.y===y); }
 function isOccupiedBySelf(idx, pid) { return PLAYERS[pid].tokens.includes(idx); }
@@ -489,23 +474,20 @@ function isOccupiedBySelfInHome(hIdx, pid) { return PLAYERS[pid].tokens.includes
 
 function checkWin(player) {
     if (player.tokens.every(t => t >= 100)) {
-        alert(`🏆 VÍTĚZSTVÍ! ${player.name} je král koček!`);
+        alert(`🏆 VÍTĚZSTVÍ! ${player.name} vyhrál!`);
         location.reload();
     }
 }
 
-// Listenery
+// Listeners
 rollBtn.addEventListener('click', () => {
     if (GAME_STATE.currentPlayerIndex === myPlayerId && GAME_STATE.turnStep === 'ROLL') {
-        if (myPlayerId === 0) handleRollLogic();
-        else sendData('REQUEST_ROLL', {});
+        if (myPlayerId === 0) handleRollLogic(); else sendData('REQUEST_ROLL', {});
     }
 });
-
 function onTokenClick(pid, idx) {
     if (pid === myPlayerId && GAME_STATE.currentPlayerIndex === myPlayerId && GAME_STATE.turnStep === 'MOVE') {
-        if (myPlayerId === 0) handleMoveLogic(0, idx);
-        else sendData('REQUEST_MOVE', { tokenIdx: idx });
+        if (myPlayerId === 0) handleMoveLogic(0, idx); else sendData('REQUEST_MOVE', { tokenIdx: idx });
     }
 }
 
