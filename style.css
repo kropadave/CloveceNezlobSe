@@ -1,0 +1,222 @@
+:root {
+    --bg-color: #FFF5E4; /* Krémová */
+    --board-bg: #FFE3E1; /* Světle růžová */
+    --path-color: #ffffff;
+    --p1-color: #FF9F43; /* Zrzavá kočka */
+    --p2-color: #54a0ff; /* Modrá kočka (nebo šedá britská) */
+    --text-color: #57606f;
+    --shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+body {
+    font-family: 'Quicksand', sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+}
+
+.game-container {
+    text-align: center;
+    max-width: 600px;
+    width: 100%;
+    padding: 20px;
+}
+
+h1 {
+    font-family: 'Fredoka One', cursive;
+    color: #ff6b6b;
+    text-shadow: 2px 2px 0px #fff;
+}
+
+/* Herní deska */
+.board-wrapper {
+    background: var(--board-bg);
+    padding: 15px;
+    border-radius: 25px;
+    box-shadow: var(--shadow);
+    display: inline-block;
+    margin: 20px 0;
+    border: 4px solid #fff;
+}
+
+#game-board {
+    display: grid;
+    grid-template-columns: repeat(11, 30px);
+    grid-template-rows: repeat(11, 30px);
+    gap: 4px;
+}
+
+.cell {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background-color: var(--path-color);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 18px;
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+/* Speciální políčka */
+.cell.start-p1 { border: 2px solid var(--p1-color); }
+.cell.start-p2 { border: 2px solid var(--p2-color); }
+.cell.home-p1 { background-color: #ffeaa7; } /* Cestička do domečku */
+.cell.home-p2 { background-color: #74b9ff; }
+
+.cell.base {
+    background-color: rgba(0,0,0,0.05);
+}
+
+/* Figurky (Kočičí hlavy) */
+.token {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    cursor: pointer;
+    transition: transform 0.2s;
+    z-index: 10;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 14px;
+}
+
+.token:hover {
+    transform: scale(1.2);
+}
+
+.token.p1 {
+    background-color: var(--p1-color);
+}
+.token.p1::after { content: "🐱"; font-size: 14px; }
+
+.token.p2 {
+    background-color: var(--p2-color);
+}
+.token.p2::after { content: "😼"; font-size: 14px; }
+
+/* Ovládání */
+.controls {
+    background: white;
+    padding: 15px;
+    border-radius: 15px;
+    box-shadow: var(--shadow);
+}
+
+.dice {
+    font-size: 40px;
+    margin-bottom: 10px;
+    height: 50px;
+}
+
+button {
+    background-color: #ff6b6b;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 20px;
+    font-family: 'Fredoka One', cursive;
+    font-size: 18px;
+    cursor: pointer;
+    transition: transform 0.1s;
+}
+
+button:active {
+    transform: scale(0.95);
+}
+
+button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+
+.player-orange { color: var(--p1-color); font-weight: bold; }
+.player-blue { color: var(--p2-color); font-weight: bold; }
+
+#message-log {
+    margin-top: 10px;
+    font-style: italic;
+    font-size: 0.9em;
+    min-height: 20px;
+}
+
+/* Zvýraznění pohybu */
+.highlight {
+    animation: pulse 1.5s infinite;
+    cursor: pointer;
+    background-color: #fab1a0 !important; 
+}
+
+@keyframes pulse {
+    0% { transform: scale(0.9); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(0.9); }
+}
+
+
+
+/* Styly pro Lobby */
+#lobby-overlay {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+}
+
+.lobby-box {
+    background: white;
+    padding: 30px;
+    border-radius: 20px;
+    text-align: center;
+    max-width: 400px;
+    width: 90%;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+}
+
+.big-btn {
+    width: 100%;
+    margin: 10px 0;
+    padding: 15px;
+    font-size: 1.1em;
+}
+
+.big-btn.blue {
+    background-color: var(--p2-color);
+}
+
+#my-id-code {
+    display: block;
+    background: #eee;
+    padding: 10px;
+    font-family: monospace;
+    font-size: 1.2em;
+    letter-spacing: 1px;
+    margin: 10px 0;
+    border-radius: 5px;
+    user-select: all; /* Usnadní kopírování */
+    border: 2px dashed #ccc;
+}
+
+.small { font-size: 0.8em; color: #888; }
+
+#player-identity {
+    font-size: 0.9em;
+    margin-top: 5px;
+    padding: 5px;
+    background: rgba(255,255,255,0.5);
+    border-radius: 10px;
+    display: inline-block;
+}
+
+#connection-status { font-weight: bold; color: #ff6b6b; }

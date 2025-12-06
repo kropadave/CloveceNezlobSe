@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kočičí, nezlob se! (Online)</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Quicksand:wght@500;700&display=swap" rel="stylesheet">
+    <!-- PeerJS knihovna pro online propojení -->
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+</head>
+<body>
+
+    <!-- HLAVNÍ MENU (LOBBY) -->
+    <div id="lobby-overlay">
+        <div class="lobby-box">
+            <h1>🐈 Kočičí Lobby 🧶</h1>
+            <p>Chceš hru založit, nebo se připojit?</p>
+            
+            <div class="lobby-section">
+                <button id="create-btn" class="big-btn">Založit novou hru (Jsem Zrzek)</button>
+                <div id="my-id-display" style="display:none;">
+                    <p>Tvoje ID hry:</p>
+                    <code id="my-id-code">Generuji...</code>
+                    <p class="small">Pošli toto ID kamarádovi.</p>
+                    <div id="waiting-msg">Čekám na připojení soupeře... ⏳</div>
+                </div>
+            </div>
+
+            <hr>
+
+            <div class="lobby-section">
+                <input type="text" id="join-input" placeholder="Vlož ID od kamaráda">
+                <button id="join-btn" class="big-btn blue">Připojit se (Jsem Modrák)</button>
+            </div>
+            <p id="connection-status"></p>
+        </div>
+    </div>
+
+    <!-- HRA (Stejná jako předtím) -->
+    <div class="game-container" id="game-container" style="display:none;"> <!-- Skryté dokud se nespojí -->
+        <header>
+            <h1>🐈 Kočičí, nezlob se! 🧶</h1>
+            <div id="status-text">Na tahu je: <span id="current-player-name" class="player-orange">Zrzek</span></div>
+            <div id="player-identity">Ty jsi: <span id="my-role">...</span></div>
+        </header>
+
+        <div class="board-wrapper">
+            <div id="game-board"></div>
+        </div>
+
+        <div class="controls">
+            <div class="dice-container">
+                <div id="dice" class="dice">🎲</div>
+                <button id="roll-btn">Hodit kostkou</button>
+            </div>
+            <div id="message-log">Čekání na zahájení hry...</div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
