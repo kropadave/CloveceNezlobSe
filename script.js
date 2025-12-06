@@ -49,7 +49,16 @@ const bases = [{x:0, y:10}, {x:1, y:10}, {x:0, y:9}, {x:1, y:9}, {x:9, y:1}, {x:
 // ==========================================
 // SÍŤOVÁ ČÁST
 // ==========================================
-const peer = new Peer(null, { debug: 1 });
+const peer = new Peer(null, {
+    debug: 2, // Více detailů v konzoli
+    config: {
+        'iceServers': [
+            { url: 'stun:stun.l.google.com:19302' },
+            { url: 'stun:stun1.l.google.com:19302' },
+            { url: 'stun:stun2.l.google.com:19302' }
+        ]
+    }
+});
 
 peer.on('open', (id) => { document.getElementById('my-id-code').innerText = id; });
 
@@ -431,3 +440,4 @@ function isOccupiedBySelf(idx, pid) { return PLAYERS[pid].tokens.includes(idx); 
 function isOccupiedBySelfInHome(hIdx, pid) { return PLAYERS[pid].tokens.includes(100+hIdx); }
 
 initBoard();
+
