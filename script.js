@@ -1,4 +1,4 @@
-console.log("Royal Cats & Mouse v8.1 - Network Fix");
+console.log("Royal Cats & Mouse v8.5 - Final Fix");
 
 // --- UI Elements ---
 const board = document.getElementById('game-board');
@@ -51,49 +51,20 @@ const bases = [{x:0, y:10}, {x:1, y:10}, {x:0, y:9}, {x:1, y:9}, {x:9, y:1}, {x:
 const SPECIAL_TILES = [5, 15, 25, 35, 12, 32]; 
 
 // ==========================================
-// SÍŤ (OPRAVENÁ)
+// SÍŤ
 // ==========================================
 
 function initPeer(customId = null) {
-    // Pokud nezadáme ID, vygenerujeme si vlastní krátké
     const idToUse = customId || "ludo" + Math.floor(Math.random() * 9000 + 1000);
-    
     peer = new Peer(idToUse, {
         debug: 1,
-        config: {
-            'iceServers': [
-                { url: 'stun:stun.l.google.com:19302' },
-                { url: 'stun:stun1.l.google.com:19302' }
-            ]
-        }
+        config: { 'iceServers': [{ url: 'stun:stun.l.google.com:19302' }] }
     });
-
-    peer.on('open', (id) => {
-        console.log('Moje ID je: ' + id);
-        if(myIdCode) myIdCode.innerText = id;
-    });
-
-    peer.on('error', (err) => {
-        console.error("PeerJS Error:", err);
-        if (err.type === 'unavailable-id') {
-            alert("Toto ID už někdo používá. Zkus stránku obnovit.");
-        } else if (err.type === 'peer-unavailable') {
-            alert("ID soupeře neexistuje nebo je offline. Zkontroluj kód.");
-            connectionStatus.innerText = "❌ Soupeř nenalezen";
-        } else if (err.type === 'network') {
-            alert("Chyba sítě! Zkontroluj připojení nebo firewall.");
-        } else {
-            alert("Chyba spojení: " + err.type);
-        }
-    });
-
-    peer.on('disconnected', () => {
-        console.log('Odpojeno od serveru. Zkouším reconnect...');
-        peer.reconnect();
+    peer.on('open', (id) => { if(myIdCode) myIdCode.innerText = id; });
+    peer.on('error', (err) => { 
+        alert("Chyba PeerJS: " + err.type); 
     });
 }
-
-// Inicializujeme Peer hned, ale s náhodným ID, abychom byli připraveni
 initPeer();
 
 document.getElementById('create-btn').addEventListener('click', () => {
@@ -101,8 +72,6 @@ document.getElementById('create-btn').addEventListener('click', () => {
     document.getElementById('create-btn').disabled = true;
     document.getElementById('my-id-wrapper').classList.remove('hidden');
     hostStatus.innerText = "Čekám na Myšáka...";
-    
-    // Posloucháme příchozí spojení
     peer.on('connection', (c) => {
         conn = c;
         setupConnection();
@@ -112,44 +81,22 @@ document.getElementById('create-btn').addEventListener('click', () => {
 document.getElementById('join-btn').addEventListener('click', () => {
     const inputVal = document.getElementById('join-input').value.trim();
     if (!inputVal) return alert("Zadej kód!");
-    
-    // Ošetření, aby uživatel nemusel psát "ludo", pokud zadal jen číslo
-    let targetId = inputVal;
-    
     myPlayerId = 1;
     connectionStatus.innerText = "Hledám...";
-    
-    // Připojujeme se
-    conn = peer.connect(targetId, { reliable: true });
-    
+    conn = peer.connect(inputVal, { reliable: true });
     conn.on('open', () => {
         connectionStatus.innerText = "✅ Spojeno!";
         setupConnection();
-        // Počkáme chvilku a pošleme Hello
         setTimeout(() => sendData('HELLO', {}), 500);
     });
-
-    conn.on('error', (err) => {
-        alert("Chyba spojení se soupeřem: " + err);
-        connectionStatus.innerText = "❌ Chyba";
-    });
+    conn.on('error', (err) => alert("Chyba spojení: " + err));
 });
 
 function setupConnection() {
     conn.on('data', (data) => handleNetworkData(data));
-    conn.on('close', () => {
-        alert("Soupeř se odpojil!");
-        location.reload();
-    });
+    conn.on('close', () => { alert("Soupeř se odpojil!"); location.reload(); });
 }
-
-function sendData(type, payload) {
-    if (conn && conn.open) {
-        conn.send({ type, payload });
-    } else {
-        console.warn("Nelze odeslat data, spojení není otevřené.");
-    }
-}
+function sendData(type, payload) { if (conn && conn.open) conn.send({ type, payload }); }
 
 // ==========================================
 // SYNC LOGIKA
@@ -169,7 +116,6 @@ function handleNetworkData(data) {
         updateUI();
         renderTokens();
         
-        // Zvýraznění pro klienta
         if (GAME_STATE.currentPlayerIndex === 1) {
             if (GAME_STATE.turnStep === 'MOVE') {
                 const moveable = getMoveableTokens(PLAYERS[1], GAME_STATE.currentRoll);
@@ -200,7 +146,7 @@ function sendState() {
 function startGameUI() {
     lobbyOverlay.classList.add('hidden');
     document.getElementById('game-container').classList.remove('hidden');
-    initBoard();
+    // initBoard() je voláno už na začátku, takže mapa je ready
     updateDiceVisual(1);
     updateUI();
 }
@@ -421,15 +367,21 @@ function initBoard() {
             cell.dataset.x = x; cell.dataset.y = y;
             
             const pIdx = pathMap.findIndex(p=>p.x===x && p.y===y);
+            const isHomeP1 = homePaths[0].some(p=>p.x===x && p.y===y);
+            const isHomeP2 = homePaths[1].some(p=>p.x===x && p.y===y);
+            const isBase = bases.some(b=>b.x===x && b.y===y);
+
             if (pIdx !== -1) {
                 cell.classList.add('path');
                 if (pIdx===0) cell.classList.add('start-p1');
                 else if (pIdx===20) cell.classList.add('start-p2');
                 else if (SPECIAL_TILES.includes(pIdx)) cell.classList.add('special');
-            } else if (homePaths[0].some(p=>p.x===x && p.y===y)) cell.classList.add('home-p1');
-            else if (homePaths[1].some(p=>p.x===x && p.y===y)) cell.classList.add('home-p2');
-            else if (bases.some(b=>b.x===x && b.y===y)) cell.classList.add('base'); 
-            else cell.style.visibility = 'hidden';
+                cell.style.visibility = 'visible';
+            } 
+            else if (isHomeP1) { cell.classList.add('home-p1'); cell.style.visibility = 'visible'; }
+            else if (isHomeP2) { cell.classList.add('home-p2'); cell.style.visibility = 'visible'; }
+            else if (isBase) { cell.classList.add('base'); cell.style.visibility = 'visible'; }
+            else { cell.style.visibility = 'hidden'; }
             
             board.appendChild(cell);
         }
@@ -558,3 +510,6 @@ function onTokenClick(pid, idx) {
         }
     }
 }
+
+// SPOUŠTĚČ MAPY - TOHLE OPRAVUJE NEVIDITELNOST
+initBoard();
