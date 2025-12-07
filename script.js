@@ -513,3 +513,4 @@ function onTokenClick(pid, idx) {
 
 // SPOUŠTĚČ MAPY - TOHLE OPRAVUJE NEVIDITELNOST
 initBoard();
+
