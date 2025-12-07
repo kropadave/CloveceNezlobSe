@@ -1,4 +1,4 @@
-console.log("Royal Cats & Mouse v7.0 - Final Edition");
+console.log("Royal Cats & Mouse v8.0 - Perfect Teleport");
 
 // --- UI Elements ---
 const board = document.getElementById('game-board');
@@ -29,16 +29,14 @@ let GAME_STATE = {
     currentRoll: 1,
     waitingForMove: false,
     rollsLeft: 1, 
-    turnStep: 'ROLL',
-    teleportAvailable: false 
+    turnStep: 'ROLL', // 'ROLL', 'MOVE', 'TELEPORT_SELECT'
+    teleportPossible: false // Indikátor, že podmínky pro teleport jsou splněny
 };
 
 let myPlayerId = null; 
 let conn = null; 
 
-// --- MAPA (Klikatá pro zajímavost) ---
-// Tvar cesty: Start vlevo dole, jde nahoru, doprava, dolů...
-// Tohle je jen reprezentace v gridu 11x11
+// --- MAPA ---
 const pathMap = [
     {x:4, y:10}, {x:4, y:9}, {x:4, y:8}, {x:4, y:7}, {x:4, y:6}, {x:3, y:6}, {x:2, y:6}, {x:1, y:6}, {x:0, y:6}, 
     {x:0, y:5}, {x:0, y:4}, {x:1, y:4}, {x:2, y:4}, {x:3, y:4}, {x:4, y:4}, {x:4, y:3}, {x:4, y:2}, {x:4, y:1}, {x:4, y:0},
@@ -105,14 +103,21 @@ function handleNetworkData(data) {
         updateUI();
         renderTokens();
         
-        if (GAME_STATE.currentPlayerIndex === 1 && GAME_STATE.turnStep === 'MOVE') {
-            const moveable = getMoveableTokens(PLAYERS[1], GAME_STATE.currentRoll);
-            highlightTokens(moveable);
-            showHints(moveable, GAME_STATE.currentRoll);
+        // Zvýraznění pro klienta
+        if (GAME_STATE.currentPlayerIndex === 1) {
+            if (GAME_STATE.turnStep === 'MOVE') {
+                const moveable = getMoveableTokens(PLAYERS[1], GAME_STATE.currentRoll);
+                highlightTokens(moveable);
+                showHints(moveable, GAME_STATE.currentRoll);
+            } else if (GAME_STATE.turnStep === 'TELEPORT_SELECT') {
+                const teleportables = getTeleportableTokens(PLAYERS[1]);
+                highlightTokens(teleportables);
+            }
         }
     }
     if (myPlayerId === 0) {
         if (data.type === 'REQUEST_ROLL') handleRollLogic();
+        if (data.type === 'REQUEST_TELEPORT_MODE') activateTeleportMode(); // Nový request
         if (data.type === 'REQUEST_MOVE') handleMoveLogic(1, data.payload.tokenIdx);
     }
 }
@@ -142,26 +147,44 @@ function resetTurn(playerId) {
     GAME_STATE.waitingForMove = false;
     GAME_STATE.turnStep = 'ROLL';
     GAME_STATE.rollsLeft = figuresInPlay ? 1 : 3;
-    GAME_STATE.teleportAvailable = false;
-
-    // --- MEGA COMBO LOGIKA ---
-    // Hráč má 2 a více figurek na boostech...
-    const tokensOnSpecial = player.tokens.filter(t => t !== -1 && t < 100 && SPECIAL_TILES.includes(t % PATH_LENGTH)).length;
-    // ... A ZÁROVEŇ má ještě nějakou JINOU figurku, která je ve hře (tzn. ne v domečku, ne na startu), kterou by mohl teleportovat.
-    const tokensAvailableToTeleport = player.tokens.some(t => t !== -1 && t < 100 && !SPECIAL_TILES.includes(t % PATH_LENGTH));
     
-    // Podmínka: 2x boost + 3. figurka k dispozici
-    if (tokensOnSpecial >= 2 && tokensAvailableToTeleport) {
-        GAME_STATE.teleportAvailable = true;
-    }
+    // --- KONTROLA TELEPORTU (Na začátku tahu) ---
+    // Podmínky:
+    // 1. Dvě figurky na boostu
+    // 2. Třetí figurka je "v poli" (ne -1, ne >=100)
+    const tokensOnSpecial = player.tokens.filter(t => t !== -1 && t < 100 && SPECIAL_TILES.includes(t % PATH_LENGTH)).length;
+    const tokensInField = player.tokens.filter(t => t !== -1 && t < 100 && !SPECIAL_TILES.includes(t % PATH_LENGTH)).length;
+    
+    GAME_STATE.teleportPossible = (tokensOnSpecial >= 2 && tokensInField >= 1);
 
-    statusText.innerText = "VS"; // Reset textu
+    statusText.innerText = "VS";
     updateUI();
 }
 
+// Spustí režim vybírání figurky pro teleport
+function activateTeleportMode() {
+    GAME_STATE.turnStep = 'TELEPORT_SELECT';
+    const player = PLAYERS[GAME_STATE.currentPlayerIndex];
+    
+    if (GAME_STATE.currentPlayerIndex === 0) {
+        const teleportables = getTeleportableTokens(player);
+        highlightTokens(teleportables);
+        // Hint v domečku
+        let freeHome = getFirstFreeHomeIndex(player.id);
+        if (freeHome !== -1) {
+            let cell = getCell(homePaths[player.id][freeHome]);
+            if (cell) cell.classList.add('target-hint');
+        }
+    }
+    
+    updateUI();
+    sendState();
+}
+
 function handleRollLogic() {
+    if (GAME_STATE.turnStep !== 'ROLL') return;
+
     let roll = Math.floor(Math.random() * 6) + 1;
-    // Rychlejší animace (jen 5 otočení)
     let rotations = 0;
     let interval = setInterval(() => {
         let tempRoll = Math.floor(Math.random() * 6) + 1;
@@ -181,6 +204,9 @@ function finalizeRoll(roll) {
     const player = PLAYERS[GAME_STATE.currentPlayerIndex];
     const moveable = getMoveableTokens(player, roll);
     updateDiceVisual(roll);
+
+    // Pokud už hodil, teleport padá
+    GAME_STATE.teleportPossible = false;
 
     if (moveable.length > 0) {
         GAME_STATE.turnStep = 'MOVE';
@@ -203,51 +229,60 @@ function handleMoveLogic(pid, tokenIdx) {
     if (pid !== GAME_STATE.currentPlayerIndex) return;
     
     const player = PLAYERS[pid];
-    const roll = GAME_STATE.currentRoll;
-    let currentPos = player.tokens[tokenIdx];
     
-    // 1. TELEPORT AKCE
-    // Pokud je aktivní, hráč musí vybrat figurku, která NENÍ na boostu (to by nedávalo smysl)
-    if (GAME_STATE.teleportAvailable && currentPos !== -1 && currentPos < 100 && !SPECIAL_TILES.includes(currentPos % PATH_LENGTH)) {
-        player.tokens[tokenIdx] = 100; // Skok na start domečku
-        GAME_STATE.teleportAvailable = false;
-        checkWin(player);
-        nextPlayer();
-        return;
+    // --- TELEPORT AKCE ---
+    if (GAME_STATE.turnStep === 'TELEPORT_SELECT') {
+        let currentPos = player.tokens[tokenIdx];
+        // Kontrola: musí to být figurka v poli a ne na boostu
+        if (currentPos !== -1 && currentPos < 100 && !SPECIAL_TILES.includes(currentPos % PATH_LENGTH)) {
+            // Najít první volné místo v domečku (od konce = index 3, pak 2, 1, 0)
+            // Zde se ptal na "volné místo", automaticky vybereme to nejlepší (nejdál)
+            let targetHomeIdx = getFirstFreeHomeIndex(pid);
+            if (targetHomeIdx !== -1) {
+                player.tokens[tokenIdx] = 100 + targetHomeIdx;
+                checkWin(player);
+                nextPlayer();
+                return;
+            }
+        }
+        return; // Neplatný výběr pro teleport
     }
 
-    // 2. BOOST
+    // --- BĚŽNÝ POHYB ---
+    const roll = GAME_STATE.currentRoll;
+    let currentPos = player.tokens[tokenIdx];
     let multiplier = 1;
     if (currentPos !== -1 && currentPos < 100 && SPECIAL_TILES.includes(currentPos % PATH_LENGTH)) {
         multiplier = 2;
     }
     const effectiveRoll = roll * multiplier;
 
-    // 3. POHYB
+    // 1. Nasazení
     if (currentPos === -1) {
-        if (roll === 6) { // Nasazení
+        if (roll === 6) { 
             player.tokens[tokenIdx] = player.startPos;
             handleKick(player.startPos, pid);
         }
-    } else if (currentPos >= 100) {
-        // POHYB V DOMEČKU
-        // 100, 101, 102, 103 jsou políčka domečku
+    } 
+    // 2. Pohyb v domečku (100+)
+    else if (currentPos >= 100) {
         let currentHomeIdx = currentPos - 100;
-        let targetHomeIdx = currentHomeIdx + roll; // Zde není multiplier, v domečku neplatí
-
-        // Musí se vejít do domečku (max index 3) a nesmí tam nikdo být
+        let targetHomeIdx = currentHomeIdx + roll;
+        // Kontrola kolize v domečku
         if (targetHomeIdx <= 3 && !isOccupiedBySelfInHome(targetHomeIdx, pid)) {
              player.tokens[tokenIdx] = 100 + targetHomeIdx;
              checkWin(player);
         }
-    } else {
-        // POHYB NA MAPĚ
+    } 
+    // 3. Pohyb na mapě
+    else {
         let relativePos = (currentPos - player.startPos + PATH_LENGTH) % PATH_LENGTH;
         let targetRelative = relativePos + effectiveRoll;
         
         if (targetRelative >= PATH_LENGTH) {
             // Vstup do domečku
             let homeIdx = targetRelative - PATH_LENGTH;
+            // Kontrola kolize v domečku
             if (homeIdx <= 3 && !isOccupiedBySelfInHome(homeIdx, pid)) {
                 player.tokens[tokenIdx] = 100 + homeIdx;
                 checkWin(player);
@@ -261,7 +296,7 @@ function handleMoveLogic(pid, tokenIdx) {
     }
 
     clearHints();
-    if (roll === 6) {
+    if (roll === 6 && GAME_STATE.turnStep !== 'TELEPORT_SELECT') {
         resetTurn(pid); 
         GAME_STATE.rollsLeft = 1; 
     } else {
@@ -281,25 +316,38 @@ function nextPlayer() {
     sendState();
 }
 
-// --- Pravidla ---
+// --- Pravidla Helpers ---
+
+function getTeleportableTokens(player) {
+    let options = [];
+    player.tokens.forEach((pos, idx) => {
+        if (pos !== -1 && pos < 100 && !SPECIAL_TILES.includes(pos % PATH_LENGTH)) {
+            options.push(idx);
+        }
+    });
+    return options;
+}
+
+function getFirstFreeHomeIndex(pid) {
+    // Hledáme od konce (3) k začátku (0)
+    for (let i = 3; i >= 0; i--) {
+        if (!isOccupiedBySelfInHome(i, pid)) return i;
+    }
+    return -1; // Domeček plný
+}
 
 function getMoveableTokens(player, roll) {
     let options = [];
     player.tokens.forEach((pos, idx) => {
-        // Teleport
-        if (GAME_STATE.teleportAvailable && pos !== -1 && pos < 100 && !SPECIAL_TILES.includes(pos % PATH_LENGTH)) {
-            options.push(idx); return;
-        }
-
         let multiplier = (pos !== -1 && pos < 100 && SPECIAL_TILES.includes(pos % PATH_LENGTH)) ? 2 : 1;
         let effective = roll * multiplier;
 
         if (pos === -1) {
             if (roll === 6 && !isOccupiedBySelf(player.startPos, player.id)) options.push(idx);
         } else if (pos >= 100) {
-            // Logika v domečku
+            // Logika v domečku - nesmí skočit na jinou figurku
             let currentHomeIdx = pos - 100;
-            let targetHomeIdx = currentHomeIdx + roll; // Bez multiplieru
+            let targetHomeIdx = currentHomeIdx + roll;
             if (targetHomeIdx <= 3 && !isOccupiedBySelfInHome(targetHomeIdx, player.id)) {
                 options.push(idx);
             }
@@ -308,6 +356,7 @@ function getMoveableTokens(player, roll) {
             let relativePos = (pos - player.startPos + PATH_LENGTH) % PATH_LENGTH;
             if (relativePos + effective >= PATH_LENGTH) {
                 let homeIdx = (relativePos + effective) - PATH_LENGTH;
+                // Vstup do domečku - nesmí tam nikdo být
                 if (homeIdx <= 3 && !isOccupiedBySelfInHome(homeIdx, player.id)) options.push(idx);
             } else {
                 let targetGlobal = (pos + effective) % PATH_LENGTH;
@@ -346,7 +395,7 @@ function initBoard() {
                 else if (SPECIAL_TILES.includes(pIdx)) cell.classList.add('special');
             } else if (isHome(x,y,0)) cell.classList.add('home-p1');
             else if (isHome(x,y,1)) cell.classList.add('home-p2');
-            else if (isBase(x,y)) cell.classList.add('base'); // Base nemá styl, je neviditelná
+            else if (isBase(x,y)) cell.classList.add('base'); 
             else cell.style.visibility = 'hidden';
             
             board.appendChild(cell);
@@ -360,8 +409,6 @@ function renderTokens() {
     PLAYERS.forEach(player => {
         player.tokens.forEach((pos, idx) => {
             let cell;
-            if (pos === -1) cell = null; // Base se nekreslí na mapě, figurky budou u jmen (viz UI update) - ZJEDNODUŠENÍ: Necháme je zatím zmizelé, nebo je vykreslíme mimo.
-            // PRO JEDNODUCHOST: Necháme je v invisible "base" políčkách, která jsme vytvořili.
             if (pos === -1) cell = getCell(bases[player.baseIndices[idx]]);
             else if (pos >= 100) cell = getCell(homePaths[player.id][pos-100]);
             else cell = getCell(pathMap[pos % PATH_LENGTH]);
@@ -370,7 +417,6 @@ function renderTokens() {
                 const t = document.createElement('div');
                 t.classList.add('token', player.class);
                 t.dataset.idx = idx;
-                // Charged efekt
                 if (pos !== -1 && pos < 100 && SPECIAL_TILES.includes(pos % PATH_LENGTH)) {
                     t.classList.add('charged');
                 }
@@ -398,16 +444,27 @@ function updateUI() {
     p1Card.classList.toggle('active', GAME_STATE.currentPlayerIndex === 0);
     p2Card.classList.toggle('active', GAME_STATE.currentPlayerIndex === 1);
     
-    // Zobrazení boost infa JEN PRO AKTIVNÍHO HRÁČE
     const isMyTurn = GAME_STATE.currentPlayerIndex === myPlayerId;
-    if (GAME_STATE.teleportAvailable && isMyTurn) {
-        powerupIndicator.classList.remove('hidden');
-        powerupIndicator.innerText = "🌀 TELEPORT!";
-    } else {
-        powerupIndicator.classList.add('hidden');
-    }
+    powerupIndicator.classList.add('hidden');
+    rollBtn.classList.remove('btn-teleport');
 
     if (isMyTurn) {
+        if (GAME_STATE.teleportPossible && GAME_STATE.turnStep === 'ROLL') {
+            // Zobrazit tlačítko Teleport MÍSTO hodu
+            rollBtn.disabled = false;
+            rollBtn.classList.add('btn-teleport');
+            rollBtn.innerHTML = `🌀 TELEPORT 🌀<span class="small">Klikni pro aktivaci</span>`;
+            return;
+        }
+
+        if (GAME_STATE.turnStep === 'TELEPORT_SELECT') {
+            rollBtn.disabled = true;
+            rollBtn.innerHTML = `VYBER FIGURKU<span class="small">Která půjde do domečku?</span>`;
+            powerupIndicator.classList.remove('hidden');
+            powerupIndicator.innerText = "Vyber figurku v poli!";
+            return;
+        }
+
         if (GAME_STATE.turnStep === 'ROLL') {
             rollBtn.disabled = false;
             rollBtn.innerHTML = `HODIT <span class="small">${GAME_STATE.rollsLeft} pokus</span>`;
@@ -424,15 +481,7 @@ function updateUI() {
 function showHints(tokenIndices, roll) {
     clearHints();
     const player = PLAYERS[GAME_STATE.currentPlayerIndex];
-    
     tokenIndices.forEach(idx => {
-        // Teleport hint = první pole domečku
-        if (GAME_STATE.teleportAvailable && !SPECIAL_TILES.includes(player.tokens[idx] % PATH_LENGTH)) {
-            let homeStart = getCell(homePaths[player.id][0]);
-            if(homeStart) homeStart.classList.add('target-hint');
-            return;
-        }
-
         const pos = player.tokens[idx];
         let multiplier = (pos !== -1 && pos < 100 && SPECIAL_TILES.includes(pos % PATH_LENGTH)) ? 2 : 1;
         let effective = roll * multiplier;
@@ -467,8 +516,6 @@ function highlightTokens(indices) {
 
 // Helpers
 function getCell(c) { return document.querySelector(`.cell[data-x="${c.x}"][data-y="${c.y}"]`); }
-function isHome(x,y,pid) { return homePaths[pid].some(p=>p.x===x && p.y===y); }
-function isBase(x,y) { return bases.some(b=>b.x===x && b.y===y); }
 function isOccupiedBySelf(idx, pid) { return PLAYERS[pid].tokens.includes(idx); }
 function isOccupiedBySelfInHome(hIdx, pid) { return PLAYERS[pid].tokens.includes(100+hIdx); }
 
@@ -481,13 +528,28 @@ function checkWin(player) {
 
 // Listeners
 rollBtn.addEventListener('click', () => {
-    if (GAME_STATE.currentPlayerIndex === myPlayerId && GAME_STATE.turnStep === 'ROLL') {
-        if (myPlayerId === 0) handleRollLogic(); else sendData('REQUEST_ROLL', {});
+    if (GAME_STATE.currentPlayerIndex === myPlayerId) {
+        // Pokud je aktivní možnost teleportu a hráč na to klikl
+        if (GAME_STATE.teleportPossible && GAME_STATE.turnStep === 'ROLL') {
+            if (myPlayerId === 0) activateTeleportMode(); 
+            else sendData('REQUEST_TELEPORT_MODE', {});
+            return;
+        }
+
+        if (GAME_STATE.turnStep === 'ROLL') {
+            if (myPlayerId === 0) handleRollLogic(); 
+            else sendData('REQUEST_ROLL', {});
+        }
     }
 });
+
 function onTokenClick(pid, idx) {
-    if (pid === myPlayerId && GAME_STATE.currentPlayerIndex === myPlayerId && GAME_STATE.turnStep === 'MOVE') {
-        if (myPlayerId === 0) handleMoveLogic(0, idx); else sendData('REQUEST_MOVE', { tokenIdx: idx });
+    if (pid === myPlayerId && GAME_STATE.currentPlayerIndex === myPlayerId) {
+        // Kliknutí pro pohyb nebo pro výběr teleportu
+        if (GAME_STATE.turnStep === 'MOVE' || GAME_STATE.turnStep === 'TELEPORT_SELECT') {
+            if (myPlayerId === 0) handleMoveLogic(0, idx); 
+            else sendData('REQUEST_MOVE', { tokenIdx: idx });
+        }
     }
 }
 
