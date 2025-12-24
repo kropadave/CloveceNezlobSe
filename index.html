@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
-    <title>Royal Cats & Mouse - 4 Players</title>
+    <title>Royal Ludo - Animal Edition</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&family=Quicksand:wght@500;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
@@ -12,14 +12,12 @@
 
     <div id="lobby-overlay">
         <div class="lobby-card glass-morphism">
-            <h1>LUDO BATTLE</h1>
-            <p class="subtitle">4 Player Edition</p>
+            <h1>LUDO ZOO 🐾</h1>
+            <p class="subtitle">Lucky 7 Edition</p>
             
             <div id="lobby-menu">
                 <button id="create-btn" class="btn-lobby pink-btn">Založit hru (Host)</button>
-                
                 <div class="divider"><span>NEBO</span></div>
-
                 <div class="join-section">
                     <input type="text" id="join-input" placeholder="Vlož kód Hostitele...">
                     <button id="join-btn" class="btn-lobby blue-btn">Připojit se</button>
@@ -27,7 +25,7 @@
             </div>
 
             <div id="host-lobby-ui" class="hidden fade-in">
-                <p>Tvůj kód pro ostatní:</p>
+                <p>Tvůj kód:</p>
                 <div class="id-box" id="my-id-code">Načítám...</div>
                 
                 <div class="lobby-list">
@@ -41,7 +39,6 @@
                 <button id="start-game-btn" class="btn-lobby green-btn" disabled>Čekám na hráče...</button>
                 <p class="status-footer" id="host-status">Minimálně 1 soupeř nutný</p>
             </div>
-
             <p id="connection-status" class="status-footer"></p>
         </div>
     </div>
@@ -52,18 +49,22 @@
             <div class="player-badge p1" id="p1-card">
                 <div class="avatar-icon">🐱</div>
                 <span class="name">P1</span>
+                <span class="sevens-count hidden">7️⃣ x 0</span>
             </div>
             <div class="player-badge p2" id="p2-card">
                 <div class="avatar-icon">🐭</div>
                 <span class="name">P2</span>
+                <span class="sevens-count hidden">7️⃣ x 0</span>
             </div>
             <div class="player-badge p3" id="p3-card">
                 <div class="avatar-icon">🐶</div>
                 <span class="name">P3</span>
+                <span class="sevens-count hidden">7️⃣ x 0</span>
             </div>
             <div class="player-badge p4" id="p4-card">
                 <div class="avatar-icon">🐦</div>
                 <span class="name">P4</span>
+                <span class="sevens-count hidden">7️⃣ x 0</span>
             </div>
         </header>
 
