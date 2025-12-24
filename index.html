@@ -2,8 +2,8 @@
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
-    <title>Royal Ludo: 4 Players</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Royal Ludo: Mobile</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&family=Quicksand:wght@500;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
@@ -12,36 +12,30 @@
 
     <div id="lobby-overlay">
         <div class="lobby-card glass-morphism">
-            <h1>🐱 🐭 🦊 🐻</h1>
-            <p class="subtitle">Royal Ludo - 4 Players</p>
+            <h1>🎲 Royal Ludo</h1>
+            <p class="subtitle">Multiplayer & Mobile Ready</p>
             
             <div id="lobby-menu">
                 <button id="create-btn" class="btn-lobby pink-btn">Založit hru (HOST)</button>
-                
                 <div class="divider"><span>NEBO</span></div>
-
                 <div class="join-section">
-                    <input type="text" id="join-input" placeholder="Vlož kód hostitele...">
+                    <input type="text" id="join-input" placeholder="Kód hostitele...">
                     <button id="join-btn" class="btn-lobby blue-btn">Připojit se</button>
                 </div>
             </div>
 
             <div id="host-panel" class="hidden fade-in">
-                <p>Tvůj kód pro ostatní:</p>
-                <div class="id-box" id="my-id-code">Načítám...</div>
-                
-                <h3>Připojení hráči:</h3>
-                <ul id="player-list">
-                    <li class="p1">1. Kočka (Ty)</li>
-                </ul>
-
-                <button id="start-game-btn" class="btn-lobby green-btn" disabled>Spustit hru (Čekám na hráče...)</button>
+                <p>Tvůj kód:</p>
+                <div class="id-box" id="my-id-code">...</div>
+                <h3>Hráči:</h3>
+                <ul id="player-list"></ul>
+                <button id="start-game-btn" class="btn-lobby green-btn" disabled>Čekám na hráče...</button>
                 <p id="host-status" class="status-footer">Čekám...</p>
             </div>
 
             <div id="client-panel" class="hidden fade-in">
                 <h3>Jsi v lobby!</h3>
-                <p class="status-text blink">Čekání na hostitele, až spustí hru...</p>
+                <p class="status-text blink">Čekání na spuštění hry...</p>
                 <p id="connection-status" class="status-footer"></p>
             </div>
         </div>
@@ -53,7 +47,7 @@
             <div id="players-bar"></div>
         </header>
 
-        <div class="turn-indicator">
+        <div class="turn-indicator glass-morphism-sm">
             <span id="game-status-text">Příprava...</span>
         </div>
 
@@ -64,20 +58,23 @@
         </section>
 
         <footer class="game-controls glass-morphism">
-            <div class="dice-wrapper">
-                <div id="dice-cube" class="dice-cube">
-                    <div class="face front">1</div>
-                    <div class="face back">2</div>
-                    <div class="face right">3</div>
-                    <div class="face left">4</div>
-                    <div class="face top">5</div>
-                    <div class="face bottom">6</div>
-                    <div class="face seven">7</div> </div>
+            <div class="dice-area">
+                <div class="dice-wrapper">
+                    <div id="dice-cube" class="dice-cube">
+                        <div class="face front">1</div>
+                        <div class="face back">2</div>
+                        <div class="face right">3</div>
+                        <div class="face left">4</div>
+                        <div class="face top">5</div>
+                        <div class="face bottom">6</div>
+                        <div class="face seven">7</div>
+                    </div>
+                </div>
             </div>
             
             <div class="action-area">
-                <div id="magic-counter" class="hidden">Magické sedmičky: <span id="seven-count-val">0</span>/3</div>
-                <div id="powerup-indicator" class="hidden"></div>
+                <div id="magic-counter" class="hidden">Magie (7): <span id="seven-count-val">0</span>/3</div>
+                <div id="info-msg" class="info-text"></div>
                 <button id="roll-btn" class="btn-action">START</button>
             </div>
         </footer>
